@@ -3,11 +3,12 @@ import psycopg2
 import os
 import sys
 import time
+import datetime
 
 # 定数定義
 # データベース接続情報
 DATABASE_HOST = "192.168.8.106"
-DATABSE_PORT = 5432
+DATABASE_PORT = 5432
 DATABASE_NAME = "pytestdb"
 DATABASE_USER = "pytest"
 DATABASE_PASSWORD = "pytest0"
@@ -47,6 +48,7 @@ def check_read_file_exist():
     elif not os.path.isfile(TOKYO_METRO_FILE_NAME):
         # 東京メトロ用のファイルが存在しない
         print(TOKYO_METRO_FILE_NAME + "がカレントディレクトリに存在しません")
+        # 使い方表示
         usage()
         return False
 
@@ -75,7 +77,7 @@ def all_data_delete(db_connection):
             cursor.execute(sql_metro_str, (SYAIN_ID,))
 
     except Exception as ee:
-        print("両者データ削除処理で予期しないエラー発生")
+        print("利用者データ削除処理で予期しないエラー発生")
         print(ee)
         return False
 
@@ -279,7 +281,8 @@ def tokyo_metro_insert(db_connection):
 # メイン処理関数
 def main():
 
-    print("処理を開始しました")
+    start_datetime = datetime.datetime.today()
+    print("処理を開始しました: " + start_datetime.strftime("%Y/%m/%d %H:%M:%S"))
 
     # 処理開始時刻を保持
     start = time.time()
@@ -289,7 +292,7 @@ def main():
                           user=DATABASE_USER,
                           password=DATABASE_PASSWORD,
                           dbname=DATABASE_NAME,
-                          port=DATABSE_PORT,
+                          port=DATABASE_PORT,
                           ) as db_connection:
 
         # 利用者データ削除処理
@@ -332,7 +335,7 @@ def main():
         print("コミット処理完了")
 
     elapsed_time = time.time() - start
-    print("処理時間:{0}".format(elapsed_time) + "[sec]")
+    print("処理時間:{:.5}".format(elapsed_time) + "[秒]")
 
     # 正常終了
     return True
@@ -350,10 +353,12 @@ if __name__ == "__main__":
     # メイン処理
     if not main():
         # 異常終了
-        print("異常終了しました")
+        end_datetime = datetime.datetime.today()
+        print("異常終了しました: " + end_datetime.strftime("%Y/%m/%d %H:%M:%S"))
         sys.exit(-1)
 
-    print("正常終了しました")
+    end_datetime = datetime.datetime.today()
+    print("正常終了しました: " + end_datetime.strftime("%Y/%m/%d %H:%M:%S"))
 
     # 正常終了
     sys.exit(0)
