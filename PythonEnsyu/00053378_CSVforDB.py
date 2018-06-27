@@ -28,7 +28,7 @@ NENDO_2016 = "2016"
 # 使い方表示
 def usage():
     print("使い方")
-    print(" python 00053378_Ensyu2.py")
+    print(" python 00053378_CSVforDB.py")
     print("")
     print("カレントディレクトリに以下のファイルを置いてください。")
     print(JR_EAST_FILE_NAME)

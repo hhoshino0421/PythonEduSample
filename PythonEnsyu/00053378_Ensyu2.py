@@ -347,7 +347,7 @@ if __name__ == "__main__":
     # ファイル存在確認
     if not check_read_file_exist():
         # ファイルが存在しない
-        # 異常修了
+        # 異常終了
         sys.exit(-1)
 
     # メイン処理
