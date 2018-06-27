@@ -1,9 +1,11 @@
 # モジュール読み込み
 import psycopg2
+import psycopg2.extras
 import os
 import sys
 import time
 import datetime
+import math
 
 # 定数定義
 # データベース接続情報
@@ -24,6 +26,18 @@ SYAIN_ID = "00053378"
 NENDO_2016 = "2016"
 
 
+# JR東日本 データ構造体
+class JreastUser:
+    def __init__(self):
+        self.ranking_no = ''
+        self.station_name = ''
+        self.non_commuter = 0
+        self.commuter = 0
+        self.total_user = 0
+        self.over_year = 0.0
+        self.deviation = ""
+
+
 # 使い方表示
 def usage():
     print("使い方")
@@ -31,20 +45,84 @@ def usage():
     print("")
 
 
-# データベースデータ存在確認処理(JR東日本)
-def check_exist_db_data_jreast():
+# データ存在チェック(共通処理)
+def check_exist_db_data(sql_str, db_connection):
 
-    pass
+    exist_data_count = 0
+
+    with db_connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
+
+        cursor.execute(sql_str, (SYAIN_ID,))
+
+        dbdata = cursor.fetchall()
+
+        if dbdata is None:
+            exist_data_count = 0
+
+        else:
+
+            if len(dbdata) <= 0:
+                exist_data_count = 0
+
+            else:
+                for rows in dbdata:
+                    exist_data_count = rows["data_cnt"]
+
+                if exist_data_count is None:
+                    exist_data_count = 0
+
+    if exist_data_count <= 0:
+        # 該当データなし
+        return False
+
+    # 該当データあり
+    # 正常終了
+    return True
+
+
+# データベースデータ存在確認処理(JR東日本)
+def check_exist_db_data_jreast(db_connection):
+
+    sql_str = "SELECT \
+                  COUNT(*) data_cnt\
+                FROM \
+                  jr_passenger \
+                WHERE \
+                  syain_id = %s"
+
+    return check_exist_db_data(sql_str, db_connection)
+
 
 # データベースデータ存在確認処理(東京メトロ)
-def check_exist_db_data_tokyometro():
+def check_exist_db_data_tokyometro(db_connection):
 
-    pass
+    sql_str = "SELECT \
+                  COUNT(*) data_cnt\
+                FROM \
+                  metro_passenger \
+                WHERE \
+                  syain_id = %s"
+
+    return check_exist_db_data(sql_str, db_connection)
 
 
 # JR東日本利用者数取得用SQL文作成
 def make_sql_jr_east():
-    sql_str = ""
+
+    sql_str = "SELECT \
+                  ranking_no \
+                  ,station_name \
+                  ,non_commuter \
+                  ,commuter \
+                  ,total_user \
+                  ,over_year \
+                FROM \
+                  jr_passenger \
+                WHERE \
+                  syain_id = %s \
+                ORDER BY \
+                  nendo \
+                  ,ranking_no"
 
     return sql_str
 
@@ -56,10 +134,113 @@ def make_sql_tokyo_metro():
     return sql_str
 
 
+# JR東日本利用者数 計算処理
+def jr_east_calc(jr_east_user_list, data_count):
+
+    # 変数初期化
+    total_user = 0
+    average = 0.0
+    standard_deviation = 0.0
+    dispersion = 0.0
+
+    # 合計人数計算
+    for rec in jr_east_user_list:
+        total_user = total_user + rec.total_user
+
+    # 平均人数計算
+    average = total_user / data_count
+
+    total_deviation = 0.0
+
+    for rec in jr_east_user_list:
+        deviation = rec.total_user - average
+        rec.deviation = str(deviation)
+
+        total_deviation = total_deviation + pow(deviation, 2)
+
+    # 分散を計算
+    dispersion = total_deviation / data_count
+
+    # 標準偏差を計算
+    standard_deviation = math.sqrt(dispersion)
+
+    return total_user, average, standard_deviation, dispersion
+
+
+# JR東日本利用者 CSV出力処理
+def jr_east_csv_output(total_user, average, standard_deviation, dispersion, jr_east_user_list):
+
+    # ヘッダ
+    header = "Total:" + str(total_user) \
+             + " ,Average:" + str(average) \
+             + " ,Standard_deviation:" + str(standard_deviation) \
+             + " ,dispersion:" + str(dispersion)
+
+    with open(JR_EAST_FILE_NAME, 'w') as file_obj:
+        file_obj.write(header)
+        file_obj.write('\n')
+
+        for rec in jr_east_user_list:
+            detail = str(rec.ranking_no) \
+                     + "," + rec.station_name \
+                     + "," + str(rec.non_commuter) \
+                     + "," + str(rec.commuter) \
+                     + "," + str(rec.total_user) \
+                     + "," + str(rec.over_year) \
+                     + "," + str(rec.deviation)
+
+            file_obj.write(detail)
+            file_obj.write('\n')
+
+    # 正常終了
+    return True
+
 # JR東日本利用者数 CSV作成処理
 def jr_east_makecsv(db_connection):
 
-    pass
+    # JR東日本利用者取得用SQL文を取得
+    sql_str = make_sql_jr_east()
+
+    with db_connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
+
+        cursor.execute(sql_str, (SYAIN_ID,))
+
+        jr_east_user_rec = cursor.fetchall()
+
+        jr_east_user_list = []
+        data_count = 0
+
+        # データ取得
+        for rows in jr_east_user_rec:
+            jr_data = JreastUser()
+            jr_data.ranking_no = rows["ranking_no"]
+            jr_data.station_name = rows["station_name"]
+            jr_data.non_commuter = rows["non_commuter"]
+            jr_data.commuter = rows["commuter"]
+            jr_data.total_user = rows["total_user"]
+            jr_data.over_year = rows["over_year"]
+
+            jr_east_user_list.append(jr_data)
+            data_count = data_count + 1
+
+        # 計算処理
+        total_user = 0
+        average = 0.0
+        standard_deviation = 0.0
+        dispersion = 0.0
+        total_user, average, standard_deviation, dispersion = jr_east_calc(jr_east_user_list, data_count)
+
+
+        # CSV出力
+        ret = jr_east_csv_output(total_user, average, standard_deviation, dispersion, jr_east_user_list)
+
+        if not ret :
+            # 異常終了
+            return False
+
+    # 正常終了
+    return True
+
 
 # 東京メトロ利用者数  CSV作成処理
 def tokyo_metro_makecsv():
@@ -85,20 +266,27 @@ def main():
                           ) as db_connection:
 
         # データ存在確認(JR東日本)
-        if check_exist_db_data_jreast():
+        if check_exist_db_data_jreast(db_connection):
             # データが存在する
             # JR東日本の処理を実行
             if not jr_east_makecsv(db_connection):
                 # 異常終了
                 return False
+        else:
+            # データが存在しない
+            print("JR東日本のデータが存在しません.")
 
 
-        if check_exist_db_data_tokyometro():
-            # データが存在する
-            # 東京メトロの処理を実行
-            if not tokyo_metro_makecsv(db_connection):
-                # 異常終了
-                return False
+        # # データ存在チェック(東京メトロ)
+        # if check_exist_db_data_tokyometro(db_connection):
+        #     # データが存在する
+        #     # 東京メトロの処理を実行
+        #     if not tokyo_metro_makecsv(db_connection):
+        #         # 異常終了
+        #         return False
+        # else:
+        #     # データが存在しない
+        #     print("東京メトロのデータが存在しません.")
 
     # 正常終了
     return True
