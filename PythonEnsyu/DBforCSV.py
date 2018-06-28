@@ -139,9 +139,7 @@ def jr_east_calc(jr_east_user_list, data_count):
 
     # 変数初期化
     total_user = 0
-    average = 0.0
-    standard_deviation = 0.0
-    dispersion = 0.0
+    total_deviation = 0.0
 
     # 合計人数計算
     for rec in jr_east_user_list:
@@ -150,12 +148,9 @@ def jr_east_calc(jr_east_user_list, data_count):
     # 平均人数計算
     average = total_user / data_count
 
-    total_deviation = 0.0
-
+    # 偏差を計算
     for rec in jr_east_user_list:
         deviation = rec.total_user - average
-        rec.deviation = str(deviation)
-
         total_deviation = total_deviation + pow(deviation, 2)
 
     # 分散を計算
@@ -164,6 +159,11 @@ def jr_east_calc(jr_east_user_list, data_count):
     # 標準偏差を計算
     standard_deviation = math.sqrt(dispersion)
 
+    # 各偏差値を計算
+    for rec in jr_east_user_list:
+        deviation_value = (10 * (rec.total_user - average) / standard_deviation) + 50
+        rec.deviation = str(deviation_value)
+
     return total_user, average, standard_deviation, dispersion
 
 
@@ -171,10 +171,10 @@ def jr_east_calc(jr_east_user_list, data_count):
 def jr_east_csv_output(total_user, average, standard_deviation, dispersion, jr_east_user_list):
 
     # ヘッダ
-    header = "Total:" + str(total_user) \
-             + " ,Average:" + str(average) \
-             + " ,Standard_deviation:" + str(standard_deviation) \
-             + " ,dispersion:" + str(dispersion)
+    header = "合計(Total):" + str(total_user) \
+             + " ,平均(Average):" + str(average) \
+             + " ,標準偏差(Standard_deviation):" + str(standard_deviation) \
+             + " ,分散(dispersion):" + str(dispersion)
 
     with open(JR_EAST_FILE_NAME, 'w') as file_obj:
         file_obj.write(header)
